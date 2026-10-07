@@ -365,6 +365,9 @@ static CACHED_ENV_VARS: LazyLock<HashSet<&'static OsStr>> = LazyLock::new(|| {
         "CPLUS_INCLUDE_PATH",
         "OBJC_INCLUDE_PATH",
         "OBJCPLUS_INCLUDE_PATH",
+        // IAR: extra include directories and extra command line options.
+        "C_INCLUDE",
+        "QCCARM",
     ]
     .iter()
     .map(OsStr::new)

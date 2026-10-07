@@ -154,6 +154,8 @@ pub enum CCompilerKind {
     Clang,
     /// Diab
     Diab,
+    /// IAR C/C++ compilers
+    Iar,
     /// Microsoft Visual C++
     Msvc,
     /// NVIDIA CUDA compiler
@@ -1473,6 +1475,9 @@ static CACHED_ENV_VARS: LazyLock<HashSet<&'static OsStr>> = LazyLock::new(|| {
         "WATCHOS_DEPLOYMENT_TARGET",
         "SDKROOT",
         "CCC_OVERRIDE_OPTIONS",
+        // IAR: extra include directories and extra command line options.
+        "C_INCLUDE",
+        "QCCARM",
     ]
     .iter()
     .map(OsStr::new)

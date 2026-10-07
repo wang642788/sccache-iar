@@ -21,6 +21,7 @@ use crate::compiler::clang::Clang;
 use crate::compiler::cudafe::CudaFE;
 use crate::compiler::diab::Diab;
 use crate::compiler::gcc::Gcc;
+use crate::compiler::iar::{self, Iar};
 use crate::compiler::msvc;
 use crate::compiler::msvc::Msvc;
 use crate::compiler::nvcc::Nvcc;
@@ -429,6 +430,7 @@ impl CompilerKind {
             CompilerKind::C(CCompilerKind::Clang) => textual_lang + " [clang]",
             CompilerKind::C(CCompilerKind::Diab) => textual_lang + " [diab]",
             CompilerKind::C(CCompilerKind::Gcc) => textual_lang + " [gcc]",
+            CompilerKind::C(CCompilerKind::Iar) => textual_lang + " [iar]",
             CompilerKind::C(CCompilerKind::Msvc) => textual_lang + " [msvc]",
             CompilerKind::C(CCompilerKind::Nvcc) => textual_lang + " [nvcc]",
             CompilerKind::C(CCompilerKind::CudaFE) => textual_lang + " [cudafe++]",
@@ -1856,6 +1858,22 @@ compiler_version=__VERSION__
     let executable = executable.as_ref();
     let resolved_executable = resolve_compiler_avoiding_wrapper(executable, &env);
 
+    // IAR compilers have no `-E`, so the test below can't identify them.
+    if iar::is_iar_like(&resolved_executable)
+        && let Some(version) = iar::detect_version(&creator, &resolved_executable, &env).await
+    {
+        debug!("Found IAR");
+        return CCompiler::new(
+            Iar {
+                version: Some(version),
+            },
+            resolved_executable,
+            &pool,
+        )
+        .await
+        .map(|c| Box::new(c) as Box<dyn Compiler<T>>);
+    }
+
     let mut cmd = creator.clone().new_command_sync(&resolved_executable);
     cmd.stdout(Stdio::piped())
         .stderr(Stdio::piped())
@@ -2480,6 +2498,29 @@ LLVM version: 6.0",
             .unwrap()
             .0;
         assert_eq!(CompilerKind::C(CCompilerKind::Diab), c.kind());
+    }
+
+    #[test]
+    fn test_detect_compiler_kind_iar() {
+        let f = TestFixture::new();
+        let iccarm = mk_bin(f.tempdir.path(), "iccarm").unwrap();
+        let creator = new_creator();
+        let runtime = single_threaded_runtime();
+        let pool = runtime.handle();
+        next_command(&creator, Ok(MockChild::new(exit_status(1), "", "no -vV")));
+        next_command(
+            &creator,
+            Ok(MockChild::new(
+                exit_status(0),
+                "IAR ANSI C/C++ Compiler V9.60.4.438/LNX for ARM\n",
+                "",
+            )),
+        );
+        let c = detect_compiler(creator, &iccarm, f.tempdir.path(), &[], &[], pool, None)
+            .wait()
+            .unwrap()
+            .0;
+        assert_eq!(CompilerKind::C(CCompilerKind::Iar), c.kind());
     }
 
     #[test]
